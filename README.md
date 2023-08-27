@@ -1,3 +1,3 @@
 # About
 
-Transport layer.
+HID DigitalPersona WebSdk (2023 version). Transport layer.

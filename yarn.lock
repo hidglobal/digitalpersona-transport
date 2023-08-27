@@ -1475,6 +1475,18 @@ terser@^5.17.4, terser@^5.6.0:
     commander "^2.20.0"
     source-map-support "~0.5.20"
 
+ts-sjcl@*:
+  version "1.0.7"
+  resolved "https://registry.yarnpkg.com/ts-sjcl/-/ts-sjcl-1.0.7.tgz#24a052e67a5c2ea8ef0c6cad421791b7c31accca"
+  integrity sha512-krZBlglIJMLyECHXK+pEOZ8CGEsycpTeS+Ab1oMmvVkLuL5q7GGRxJ/+2sB5BzsFtxXh1cCFQ+gN9LsP8mTNvg==
+
+ts-srpclient@^1.0.4:
+  version "1.0.4"
+  resolved "https://registry.yarnpkg.com/ts-srpclient/-/ts-srpclient-1.0.4.tgz#c467ec660caf0d794c4a1e7707738ef1d04abb80"
+  integrity sha512-6fkK4nfgz6e+bMxOqk9R/DjcBLqeTxQHGELd1PpTbzQ6dWyh29QDLzcFkP4w/Q6i/g/XNmP2XwgAeSw2/Ncieg==
+  dependencies:
+    ts-sjcl "*"
+
 tslib@^2.5.3:
   version "2.5.3"
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.5.3.tgz#24944ba2d990940e6e982c4bea147aba80209913"
