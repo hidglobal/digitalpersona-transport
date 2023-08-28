@@ -4,6 +4,7 @@ import nodeResolve from "@rollup/plugin-node-resolve";
 import typescript from "@rollup/plugin-typescript";
 import terser from "@rollup/plugin-terser";
 import filesize from "rollup-plugin-filesize";
+import dts from "rollup-plugin-dts";
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url)).toString());
 
@@ -42,10 +43,26 @@ function makeEs({ input, output }) {
     };
 }
 
+function makeDts({ input, output }) {
+    return {
+        input: "dist/types/index.d.ts",
+        output: {
+            file: "dist/index.d.ts",
+            format: "es",
+        },
+        plugins: [
+            // nodeResolve(),
+            // typescript({ outDir: "dist", declarationDir: "dist/types", declaration: true }),
+            dts(),
+        ],
+    };
+}
+
 const scrFromTs = "src/index.ts";
 
 export default [
     makeUmd({ input: scrFromTs, output: `dist/umd/websdk.client.min.js`, minify: true }),
     makeUmd({ input: scrFromTs, output: `dist/umd/websdk.client.js`, minify: false }),
     makeEs({ input: scrFromTs, output: `dist/index.js` }),
+    // makeDts({ input: scrFromTs, output: `dist/index.js` }),
 ];
