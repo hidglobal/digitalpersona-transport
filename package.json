@@ -10,6 +10,10 @@
         "url": "git+https://github.com/hidglobal/digitalpersona-transport.git"
     },
     "type": "module",
+    "files": [
+        "./src",
+        "./dist"
+    ],
     "devDependencies": {
         "@rollup/plugin-json": "^6.0.0",
         "@rollup/plugin-node-resolve": "15.2.1",
@@ -24,8 +28,10 @@
     "dependencies": {
         "ts-srpclient": "latest"
     },
-    "main": "index.js",
-    "module": "dist/ts",
+    "main": "dist/umd/websdk.client.js",
+    "browser": "dist/umd/websdk.client.js",
+    "module": "dist/index.js",
+    "types": "dist/types/index.d.ts",
     "scripts": {
         "dev": "rollup -c -w",
         "build": "rollup -c",

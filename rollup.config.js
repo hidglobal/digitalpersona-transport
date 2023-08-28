@@ -1,17 +1,13 @@
 // @ts-check
+import { readFileSync } from 'node:fs';
 import nodeResolve from "@rollup/plugin-node-resolve";
 import typescript from "@rollup/plugin-typescript";
 import terser from "@rollup/plugin-terser";
 import filesize from "rollup-plugin-filesize";
-import meta from "./package.json" assert {type: "json"};
 
-const extensions = ['.ts', '.js'];
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url)).toString());
 
-const commonPlugins = [
-    nodeResolve({ extensions }),
-];
-
-function configUmd({ input, output, minify }) {
+function makeUmd({ input, output, minify }) {
     return {
         input,
         output: {
@@ -20,16 +16,18 @@ function configUmd({ input, output, minify }) {
             format: "umd",
             indent: true,
             extend: true,
-            banner: `//maxzz ${meta.homepage} v${meta.version}`
+            banner: `// Package: ${pkg.name}\n// Homepage: ${pkg.homepage}\n// Version: v${pkg.version}\n`,
         },
         plugins: [
-            ...commonPlugins,
+            nodeResolve(),
+            typescript({ outDir: "dist/umd", declaration: false }),
             minify ? terser() : [],
+            minify ? filesize({ showBeforeSizes: "build", showGzippedSize: true }) : [],
         ],
     };
 }
 
-function configTsMin({ input, output }) {
+function makeEs({ input, output }) {
     return {
         input,
         output: {
@@ -38,49 +36,16 @@ function configTsMin({ input, output }) {
             format: "es",
         },
         plugins: [
-            ...commonPlugins,
-            filesize({ showBeforeSizes: "build", showGzippedSize: true }),
-            terser(),
+            nodeResolve(),
+            typescript({ outDir: "dist", declarationDir: "dist/types", declaration: true }),
         ],
     };
 }
 
-function configTs({ input, output }) {
-    return {
-        input,
-        output: {
-            file: output,
-            name: "WebSdk",
-            format: "es",
-        },
-        plugins: [
-            ...commonPlugins,
-        ],
-    };
-}
-
-function configTsDefs({ input, output }) {
-    return {
-        input,
-        output: {
-            file: output,
-            name: "WebSdk",
-            format: "es",
-        },
-        plugins: [
-            ...commonPlugins,
-            typescript({ emitDeclarationOnly: true, declaration: true, })
-        ],
-    };
-}
-
-const scrFromBuild = "./build/websdk.client.js";
-const scrFromTs = "./src/websdk.client.ts";
+const scrFromTs = "src/index.ts";
 
 export default [
-    configUmd({ input: scrFromBuild, output: `dist/umd/websdk.client.js`, minify: false }),
-    configUmd({ input: scrFromBuild, output: `dist/umd/websdk.client.min.js`, minify: true }),
-    configTsMin({ input: scrFromBuild, output: `dist/index.es.min.js` }),
-    configTs({ input: scrFromBuild, output: `dist/index.js` }),
-    configTsDefs({ input: scrFromTs, output: `dist/index.js` }),
+    makeUmd({ input: scrFromTs, output: `dist/umd/websdk.client.min.js`, minify: true }),
+    makeUmd({ input: scrFromTs, output: `dist/umd/websdk.client.js`, minify: false }),
+    makeEs({ input: scrFromTs, output: `dist/index.js` }),
 ];
