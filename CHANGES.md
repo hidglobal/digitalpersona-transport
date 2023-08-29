@@ -68,3 +68,99 @@ smartcard readers etc. These devices are not directly accessible from Javascript
 * Private variable WebSdk renamed to envSdk. WebSdk name was used for everything.
 * Remove property 'path' from WebChannelClient. It's comming from user already and is duplicate of user information
 * WebSdk.IWebChannelClient.sendDataBin type is (data: number[]) => void; not (data: ArrayBuffer) => void (see AESEncryption())
+
+# Original API file
+
+```ts
+declare module WebSdk {
+
+    interface IWebChannelClient {
+        /**
+        * Connects to the server with available configuration. If connection failed, onConnectionFailed callback will be called.
+        */
+        connect: () => void;
+        
+        /**
+        * Dicconnects from the server or stops attempts to restore lost connection.
+        */
+        disconnect: () => void;
+
+        /**
+        * Callback invoked when client cannot connect to the server (because has no data in local storage or this data is obsolete).
+        */
+        onConnectionFailed: () => void;
+
+        /**
+        * Callback invoked when client successfully connected to the server.
+        */
+        onConnectionSucceed: () => void;
+
+        /**
+        * Callback invoked when binary data  is received from the server.
+        * @param {ArrayBuffer} data
+        */
+        onDataReceivedBin: (data: ArrayBuffer) => void;
+
+        /**
+        * Callback invoked when binary data  is received from the server.
+        * @param {string} data
+        */
+        onDataReceivedTxt: (data: string) => void;
+
+        /**
+        * Sends binary data to the server.
+        * @param {number[]} data
+        */
+        sendDataBin: (data: number[]) => void;
+
+        /**
+        * Sends text data to the server.
+        * @param {string} data
+        */
+        sendDataTxt: (data: string) => void;
+
+        /**
+        * Returns current connection state of the client.
+        */
+        isConnected(): boolean;
+    }
+
+    class WebChannelOptions {
+        constructor(options: Object);
+
+        /*
+        * If true debug logs are outputted to browser Console
+        */
+        debug(): boolean;
+        debug(value: boolean): void;
+
+        /*
+        * Version of WebSdk channel (1,2,3,etc.). This should be one of WebSdkEncryptionSupport numbers.
+        */
+        version(): number;
+        version(value: number): void;
+    }
+
+    class WebChannelClient implements IWebChannelClient {
+        /**
+        * Creates WebChannelClient
+        * @param {string} path - the path that identifies registered WebSdk plugin
+        * @param {WebChannelOptions} options - the options to configure web channel
+        */
+        constructor(path: string, options?: WebChannelOptions);
+
+        connect(): Promise<void>;
+        disconnect(): Promise<void>;
+
+        onConnectionFailed(): void;
+        onConnectionSucceed(): void;
+        onDataReceivedBin(data: ArrayBuffer): void;
+        onDataReceivedTxt(data: string): void;
+
+        sendDataBin(data: number[]): void;
+        sendDataTxt(data: string): void;
+
+        isConnected(): boolean;
+    }
+}
+```
