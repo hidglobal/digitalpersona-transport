@@ -117,18 +117,15 @@ class Configurator {
         //await this.parseHostReply(connectionString);
 
         const sessionData = getSRPSessionData(connectionString);
-        if (!sessionData) {
-            throw new Error('Cannot parse connection string');
-        }
         this.session = sessionData;
 
         sessionStorage.setItem(SESSIONSTORAGE_CONNECTION_STR_KEY, JSON.stringify(sessionData));
 
-        function getSRPSessionData(connectionString: string | undefined): SRPSessionData | undefined {
+        function getSRPSessionData(connectionString: string): SRPSessionData {
+            traceSdk(`Configurator: DpHost string: "${connectionString}"`);
+
             const co = parseConnectionString(connectionString);
-            if (!co) {
-                return;
-            }
+
             const sd: SRPSessionData = {
                 host: co.hostname,
                 port: parseInt(co.web_sdk_port || ''),
@@ -139,20 +136,20 @@ class Configurator {
                     salt: co.web_sdk_salt,
                 },
             };
-            if (sd.port && sd.host && sd.srpClient?.p1 && sd.srpClient.p2 && sd.srpClient.salt) {
-                return sd;
+
+            if (!sd.port || !sd.host || !sd.srpClient?.p1 || !sd.srpClient.p2 || !sd.srpClient.salt) {
+                throw new Error('Cannot parse connection string');
             }
+
+            return sd;
         }
 
-        function parseConnectionString(str?: string): SRPDpHostData | undefined {
-            traceSdk(`Configurator: DpHost string: "${str}"`);
-            if (str) {
-                const [_host, rest] = str.split('?');
-                const params = (`hostname=127.0.0.1&${rest}`.split('&') || []);
-                return Object.fromEntries(params.map((param) => param.split('=')));
-            }
+        function parseConnectionString(str: string): SRPDpHostData {
+            const [_host, rest] = str.split('?');
+            const params = (`hostname=127.0.0.1&${rest}`.split('&') || []);
+            const rv = Object.fromEntries(params.map((param) => param.split('=')));
+            return rv;
         }
-
     }
 
     public async getDpHostConnectionUrl(): Promise<string> {
