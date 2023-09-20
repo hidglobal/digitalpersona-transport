@@ -264,10 +264,7 @@ export class WebChannelClientImpl {
         }
 
         try {
-            const res = await configurator.ensureLoaded();
-            if (res.error) {
-                throw new Error(res.error);
-            }
+            await configurator.ensureLoaded();
 
             let attemptsLeft = nAttempts;
             let res2: ErrorOrDataResult;

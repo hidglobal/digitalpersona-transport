@@ -99,33 +99,32 @@ class Configurator {
         return this.session;
     }
 
-    public async ensureLoaded(): Promise<ErrorOrDataResult> {
-        try {
-            const sessionPrivate = await this.getSessionStorageData();
+    public async ensureLoaded(): Promise<void> {
+        const sessionPrivate = await this.getSessionStorageData();
 
-            const { port, host, srpClient } = sessionPrivate;
-            if (port && host && srpClient) {
-                return {};
-            }
-
-            const response = await ajax<{ endpoint: string; }>('get', 'https://127.0.0.1:52181/get_connection');
-            if (this.parseHostReply(response?.endpoint)) {
-                return {};
-            }
-        } catch (error) {
+        const { port, host, srpClient } = sessionPrivate;
+        if (port && host && srpClient) {
+            return;
         }
-        return { error: 'Cannot load configuration' };
+
+        const response = await ajax<{ endpoint: string; }>('get', 'https://127.0.0.1:52181/get_connection');
+
+        const connectionString = response?.endpoint;
+        if (!connectionString) {
+            throw new Error('No endpoint');
+        }
+
+        await this.parseHostReply(connectionString);
     }
 
-    private parseHostReply(connectionString: string | undefined): boolean {
+    private async parseHostReply(connectionString: string): Promise<void> {
         const sd = getSRPSessionData(connectionString);
         if (!sd) {
-            return false;
+            throw new Error('Cannot parse connection string');
         }
         this.session = sd;
 
         sessionStorage.setItem(SESSIONSTORAGE_CONNECTION_STR_KEY, JSON.stringify(sd));
-        return true;
 
         function getSRPSessionData(connectionString: string | undefined): SRPSessionData | undefined {
             const co = parseConnectionString(connectionString);
