@@ -13,7 +13,32 @@ export function createDeferredPromise<T = void>(): DeferredPromise<T> {
     return rv;
 }
 
-export function ajax<T>(method: string, url: string, data?: Record<string, string>): Promise<T> {
+export function ajax2<T>(method: string, url: string, data?: Record<string, string>): Promise<T> {
+    const response = fetch(url, {
+        method: method,
+        headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: data ? new URLSearchParams(data) : undefined
+    });
+    return response.then(r => r.json());
+}
+
+export async function ajax<T>(method: string, url: string, data?: Record<string, string>): Promise<T> {
+    const response = await fetch(url, {
+        method: method,
+        headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: data ? new URLSearchParams(data) : undefined
+    });
+    const json = await response.json();
+    return json;
+}
+
+export function ajax0<T>(method: string, url: string, data?: Record<string, string>): Promise<T> {
     const promise = new Promise<T>(
         function (resolve, reject) {
             const xhr = new XMLHttpRequest();
