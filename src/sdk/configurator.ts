@@ -62,7 +62,7 @@ type SRPDpHostData = {
 export type ErrorOrDataResult<T = string> = { error?: string, data?: T; };
 
 class Configurator {
-    public session: SRPSessionData = {
+    private session: SRPSessionData = {
         port: 0,
         host: "127.0.0.1",
         secure: true,
@@ -70,6 +70,17 @@ class Configurator {
     };
 
     constructor() {
+        // try {
+        //     const storageStr = sessionStorage.getItem(SESSIONSTORAGE_CONNECTION_STR_KEY);
+        //     const sessionData: SRPSessionData = storageStr && JSON.parse(storageStr);
+        //     if (sessionData) {
+        //         this.session = sessionData;
+        //     }
+        // } catch (error) {
+        // }
+    }
+
+    async getSessionStorageData(): Promise<SRPSessionData> {
         try {
             const storageStr = sessionStorage.getItem(SESSIONSTORAGE_CONNECTION_STR_KEY);
             const sessionData: SRPSessionData = storageStr && JSON.parse(storageStr);
@@ -78,13 +89,18 @@ class Configurator {
             }
         } catch (error) {
         }
+        return this.session;
     }
 
     public async ensureLoaded(): Promise<ErrorOrDataResult> {
         try {
-            if (this.session.port && this.session.host && this.session.srpClient) {
+            const sessionPrivate = this.session;
+
+            const { port, host, srpClient } = sessionPrivate;
+            if (port && host && srpClient) {
                 return {};
             }
+
             const response = await ajax<{ endpoint: string; }>('get', 'https://127.0.0.1:52181/get_connection');
             if (this.parseHostReply(response?.endpoint)) {
                 return {};
@@ -134,7 +150,9 @@ class Configurator {
     }
 
     public getDpHostConnectionUrl(): string {
-        const { port, host, secure } = this.session;
+        const sessionPrivate = this.session;
+
+        const { port, host, secure } = sessionPrivate;
         if (!port || !host) {
             throw new Error('No connection url');
         }
@@ -143,8 +161,10 @@ class Configurator {
     }
 
     public getDpAgentConnectionUrl({ dpAgentChannelId, M1 = 'no.M1' }: { dpAgentChannelId: string, M1: string | undefined; }): string {
-        const { port, host, secure } = this.session;
-        if (!port || !host || !this.session.srpClient) {
+        const sessionPrivate = this.session;
+
+        const { port, host, secure, srpClient } = sessionPrivate;
+        if (!port || !host || !srpClient) {
             throw new Error('No port,host,srpClient');
         }
         const newUrl = `${secure ? 'https' : 'http'}://${host}:${port.toString()}`;
@@ -154,7 +174,7 @@ class Configurator {
             this.sessionId = sessionId = sjcl.codec.hex.fromBits(sjcl.random.randomWords(2, 0));
         }
 
-        let connectionUrl = `${newUrl.replace('http', 'ws')}/${dpAgentChannelId}?username=${this.session.srpClient.p1}&M1=${M1}`;
+        let connectionUrl = `${newUrl.replace('http', 'ws')}/${dpAgentChannelId}?username=${srpClient.p1}&M1=${M1}`;
         connectionUrl += `&sessionId=${this.sessionId}`;
         connectionUrl += `&version=${envSdk.version.toString()}`;
 

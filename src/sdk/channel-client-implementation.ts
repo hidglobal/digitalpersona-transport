@@ -196,7 +196,7 @@ export class WebChannelClientImpl {
 
     private async generateSessionKey(): Promise<ErrorOrDataResult> {
         try {
-            const srpData = configurator.session.srpClient;
+            const srpData = (await configurator.getSessionStorageData()).srpClient;
             if (!srpData?.p1 || !srpData.p2 || !srpData.salt) {
                 return { error: "No data available for authentication" };
             }
