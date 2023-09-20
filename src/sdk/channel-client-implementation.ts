@@ -210,7 +210,7 @@ export class WebChannelClientImpl {
 
             const A: BigInteger = srpClient.calculateA(a);
 
-            const response = await ajax<{ version: number; B: BigInteger; }>('post', configurator.getDpHostConnectionUrl(), {
+            const response = await ajax<{ version: number; B: BigInteger; }>('post', await configurator.getDpHostConnectionUrl(), {
                 username: srpData.p1,
                 A: srpClient.toHexString(A),
                 version: envSdk.version.toString(),
@@ -246,7 +246,7 @@ export class WebChannelClientImpl {
         }
 
         try {
-            const connectionUrl = configurator.getDpAgentConnectionUrl({ dpAgentChannelId: this.dpAgentChannelId, M1: this.M1 });
+            const connectionUrl = await configurator.getDpAgentConnectionUrl({ dpAgentChannelId: this.dpAgentChannelId, M1: this.M1 });
             await this.wsconnect(connectionUrl);
             return {};
         } catch (error) {

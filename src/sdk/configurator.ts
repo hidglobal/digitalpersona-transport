@@ -62,39 +62,46 @@ type SRPDpHostData = {
 export type ErrorOrDataResult<T = string> = { error?: string, data?: T; };
 
 class Configurator {
-    private session: SRPSessionData = {
-        port: 0,
-        host: "127.0.0.1",
-        secure: true,
-        srpClient: null,
-    };
+    private session: SRPSessionData | null = null;
+    // {
+    //     port: 0,
+    //     host: "127.0.0.1",
+    //     secure: true,
+    //     srpClient: null,
+    // };
 
-    constructor() {
-        // try {
-        //     const storageStr = sessionStorage.getItem(SESSIONSTORAGE_CONNECTION_STR_KEY);
-        //     const sessionData: SRPSessionData = storageStr && JSON.parse(storageStr);
-        //     if (sessionData) {
-        //         this.session = sessionData;
-        //     }
-        // } catch (error) {
-        // }
-    }
+    // constructor() {
+    //     try {
+    //         const storageStr = sessionStorage.getItem(SESSIONSTORAGE_CONNECTION_STR_KEY);
+    //         const sessionData: SRPSessionData = storageStr && JSON.parse(storageStr);
+    //         if (sessionData) {
+    //             this.session = sessionData;
+    //         }
+    //     } catch (error) {
+    //     }
+    // }
 
     async getSessionStorageData(): Promise<SRPSessionData> {
-        try {
-            const storageStr = sessionStorage.getItem(SESSIONSTORAGE_CONNECTION_STR_KEY);
-            const sessionData: SRPSessionData = storageStr && JSON.parse(storageStr);
-            if (sessionData) {
-                this.session = sessionData;
-            }
-        } catch (error) {
+        if (this.session) {
+            return this.session;
         }
+
+        const storageStr = sessionStorage.getItem(SESSIONSTORAGE_CONNECTION_STR_KEY);
+        const sessionData: SRPSessionData = storageStr && JSON.parse(storageStr);
+        if (sessionData) {
+            this.session = sessionData;
+        }
+
+        if (!this.session) {
+            throw new Error('No session data');
+        }
+
         return this.session;
     }
 
     public async ensureLoaded(): Promise<ErrorOrDataResult> {
         try {
-            const sessionPrivate = this.session;
+            const sessionPrivate = await this.getSessionStorageData();
 
             const { port, host, srpClient } = sessionPrivate;
             if (port && host && srpClient) {
@@ -116,6 +123,7 @@ class Configurator {
             return false;
         }
         this.session = sd;
+
         sessionStorage.setItem(SESSIONSTORAGE_CONNECTION_STR_KEY, JSON.stringify(sd));
         return true;
 
@@ -137,20 +145,20 @@ class Configurator {
             if (sd.port && sd.host && sd.srpClient?.p1 && sd.srpClient.p2 && sd.srpClient.salt) {
                 return sd;
             }
+        }
 
-            function parseConnectionString(str?: string): SRPDpHostData | undefined {
-                traceSdk(`Configurator: DpHost string: "${str}"`);
-                if (str) {
-                    const [_host, rest] = str.split('?');
-                    const params = (`hostname=127.0.0.1&${rest}`.split('&') || []);
-                    return Object.fromEntries(params.map((param) => param.split('=')));
-                }
+        function parseConnectionString(str?: string): SRPDpHostData | undefined {
+            traceSdk(`Configurator: DpHost string: "${str}"`);
+            if (str) {
+                const [_host, rest] = str.split('?');
+                const params = (`hostname=127.0.0.1&${rest}`.split('&') || []);
+                return Object.fromEntries(params.map((param) => param.split('=')));
             }
         }
     }
 
-    public getDpHostConnectionUrl(): string {
-        const sessionPrivate = this.session;
+    public async getDpHostConnectionUrl(): Promise<string> {
+        const sessionPrivate = await this.getSessionStorageData();
 
         const { port, host, secure } = sessionPrivate;
         if (!port || !host) {
@@ -160,8 +168,8 @@ class Configurator {
         return `${newUrl}/connect`;
     }
 
-    public getDpAgentConnectionUrl({ dpAgentChannelId, M1 = 'no.M1' }: { dpAgentChannelId: string, M1: string | undefined; }): string {
-        const sessionPrivate = this.session;
+    public async getDpAgentConnectionUrl({ dpAgentChannelId, M1 = 'no.M1' }: { dpAgentChannelId: string, M1: string | undefined; }): Promise<string> {
+        const sessionPrivate = await this.getSessionStorageData();
 
         const { port, host, secure, srpClient } = sessionPrivate;
         if (!port || !host || !srpClient) {
