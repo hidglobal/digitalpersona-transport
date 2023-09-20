@@ -111,20 +111,18 @@ class Configurator {
 
         const connectionString = response?.endpoint;
         if (!connectionString) {
-            throw new Error('No endpoint');
+            throw new Error('No connection endpoint.');
         }
 
-        await this.parseHostReply(connectionString);
-    }
+        //await this.parseHostReply(connectionString);
 
-    private async parseHostReply(connectionString: string): Promise<void> {
-        const sd = getSRPSessionData(connectionString);
-        if (!sd) {
+        const sessionData = getSRPSessionData(connectionString);
+        if (!sessionData) {
             throw new Error('Cannot parse connection string');
         }
-        this.session = sd;
+        this.session = sessionData;
 
-        sessionStorage.setItem(SESSIONSTORAGE_CONNECTION_STR_KEY, JSON.stringify(sd));
+        sessionStorage.setItem(SESSIONSTORAGE_CONNECTION_STR_KEY, JSON.stringify(sessionData));
 
         function getSRPSessionData(connectionString: string | undefined): SRPSessionData | undefined {
             const co = parseConnectionString(connectionString);
@@ -154,6 +152,7 @@ class Configurator {
                 return Object.fromEntries(params.map((param) => param.split('=')));
             }
         }
+
     }
 
     public async getDpHostConnectionUrl(): Promise<string> {
