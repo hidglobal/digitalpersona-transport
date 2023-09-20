@@ -47,7 +47,7 @@ type SRPSessionData = {
     srpClient: SRPClientCreds | null;
 };
 
-type SRPDpHostData = {
+type DpHostReply = {
     hostname: string;         // = "127.0.0.1" // for now it is always "127.0.0.1"
     web_sdk_port: string;     // = "web_sdk_port=9001"
     web_sdk_secure: string;   // = "web_sdk_secure=true"
@@ -122,9 +122,7 @@ class Configurator {
         sessionStorage.setItem(SESSIONSTORAGE_CONNECTION_STR_KEY, JSON.stringify(sessionData));
 
         function getSRPSessionData(connectionString: string): SRPSessionData {
-            traceSdk(`Configurator: DpHost string: "${connectionString}"`);
-
-            const co = parseConnectionString(connectionString);
+            const co = parseDpHostReply(connectionString);
 
             const sd: SRPSessionData = {
                 host: co.hostname,
@@ -144,8 +142,10 @@ class Configurator {
             return sd;
         }
 
-        function parseConnectionString(str: string): SRPDpHostData {
-            const [_host, rest] = str.split('?');
+        function parseDpHostReply(reply: string): DpHostReply {
+            traceSdk(`Configurator: DpHost string: "${reply}"`);
+
+            const [_host, rest] = reply.split('?');
             const params = (`hostname=127.0.0.1&${rest}`.split('&') || []);
             const rv = Object.fromEntries(params.map((param) => param.split('=')));
             return rv;
@@ -184,11 +184,11 @@ class Configurator {
         return connectionUrl;
     }
 
-    public get sessionId(): string | null {
+    private get sessionId(): string | null {
         return sessionStorage.getItem(SESSIONSTORAGE_SESSION_ID_KEY);
     }
 
-    public set sessionId(value: string | null) {
+    private set sessionId(value: string | null) {
         if (!value) {
             sessionStorage.removeItem(SESSIONSTORAGE_SESSION_ID_KEY);
         } else {
