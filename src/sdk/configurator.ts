@@ -112,7 +112,7 @@ export type ErrorOrDataResult<T = string> = { error?: string, data?: T; };
 class Configurator {
     private session: SRPSessionData | null = null; // { port: 0, host: "127.0.0.1", secure: true, srpClient: null, };
 
-    async getSessionStorageData(): Promise<SRPSessionData> {
+    async getSessionStorageData(): Promise<SRPSessionData | null> {
         if (this.session) {
             return this.session;
         }
@@ -124,9 +124,9 @@ class Configurator {
             this.session = sessionData;
         }
 
-        if (!this.session) {
-            throw new Error('No session data');
-        }
+        // if (!this.session) {
+        //     throw new Error('No session data');
+        // }
 
         return this.session;
     }
@@ -134,9 +134,11 @@ class Configurator {
     public async ensureLoaded(): Promise<void> {
         const sessionPrivate = await this.getSessionStorageData();
 
-        const { port, host, srpClient } = sessionPrivate;
-        if (port && host && srpClient) {
-            return;
+        if (sessionPrivate) {
+            const { port, host, srpClient } = sessionPrivate;
+            if (port && host && srpClient) {
+                return;
+            }
         }
 
         const response = await ajax<{ endpoint: string; }>('get', 'https://127.0.0.1:52181/get_connection');
@@ -185,6 +187,9 @@ class Configurator {
 
     public async getDpHostConnectionUrl(): Promise<string> {
         const sessionPrivate = await this.getSessionStorageData();
+        if (!sessionPrivate) {
+            throw new Error('No session data');
+        }
 
         const { port, host, secure } = sessionPrivate;
         if (!port || !host) {
@@ -196,11 +201,15 @@ class Configurator {
 
     public async getDpAgentConnectionUrl({ dpAgentChannelId, M1 = 'no.M1' }: { dpAgentChannelId: string, M1: string | undefined; }): Promise<string> {
         const sessionPrivate = await this.getSessionStorageData();
+        if (!sessionPrivate) {
+            throw new Error('No session data');
+        }
 
         const { port, host, secure, srpClient } = sessionPrivate;
         if (!port || !host || !srpClient) {
             throw new Error('No port,host,srpClient');
         }
+
         const newUrl = `${secure ? 'https' : 'http'}://${host}:${port.toString()}`;
 
         // let sessionId = this.sessionId;

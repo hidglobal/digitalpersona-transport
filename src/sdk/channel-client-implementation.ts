@@ -4,6 +4,11 @@ import { ErrorOrDataResult, configurator } from './configurator';
 import { FixedQueue, ajax, createDeferredPromise } from './utils';
 import * as cipher from './cipher';
 
+export type OnConnectionFailed = WebChannelClientImpl['onConnectionFailed'];
+export type OnConnectionSucceed = WebChannelClientImpl['onConnectionSucceed'];
+export type OnDataReceivedBin = WebChannelClientImpl['onDataReceivedBin'];
+export type OnDataReceivedTxt = WebChannelClientImpl['onDataReceivedTxt'];
+
 export class WebChannelClientImpl {
     private dpAgentChannelId: string;
 
@@ -196,7 +201,7 @@ export class WebChannelClientImpl {
 
     private async generateSessionKey(): Promise<ErrorOrDataResult> {
         try {
-            const srpData = (await configurator.getSessionStorageData()).srpClient;
+            const srpData = (await configurator.getSessionStorageData())?.srpClient;
             if (!srpData?.p1 || !srpData.p2 || !srpData.salt) {
                 return { error: "No data available for authentication" };
             }

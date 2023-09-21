@@ -1,10 +1,5 @@
 ﻿import { OptionsParams, WebChannelOptions, envSdk, traceSdk } from './channel-definitions';
-import { WebChannelClientImpl } from './channel-client-implementation';
-
-export type OnConnectionFailed = WebChannelClientImpl['onConnectionFailed'];
-export type OnConnectionSucceed = WebChannelClientImpl['onConnectionSucceed'];
-export type OnDataReceivedBin = WebChannelClientImpl['onDataReceivedBin'];
-export type OnDataReceivedTxt = WebChannelClientImpl['onDataReceivedTxt'];
+import { OnConnectionFailed, OnConnectionSucceed, OnDataReceivedBin, OnDataReceivedTxt, WebChannelClientImpl } from './channel-client-implementation';
 
 export class WebChannelClient {
     private impl: WebChannelClientImpl;
