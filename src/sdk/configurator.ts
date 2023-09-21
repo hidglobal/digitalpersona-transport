@@ -20,7 +20,8 @@ async function getSessionStorageItem<TResult = string>(key: string): Promise<TRe
                 if (chrome.runtime.lastError) {
                     reject(chrome.runtime.lastError);
                 } else {
-                    resolve(result[key]);
+                    const value = result[key];
+                    resolve(value);
                 }
             });
         });
@@ -109,31 +110,15 @@ type DpHostReply = {
 export type ErrorOrDataResult<T = string> = { error?: string, data?: T; };
 
 class Configurator {
-    private session: SRPSessionData | null = null;
-    // {
-    //     port: 0,
-    //     host: "127.0.0.1",
-    //     secure: true,
-    //     srpClient: null,
-    // };
-
-    // constructor() {
-    //     try {
-    //         const storageStr = sessionStorage.getItem(SESSIONSTORAGE_CONNECTION_STR_KEY);
-    //         const sessionData: SRPSessionData = storageStr && JSON.parse(storageStr);
-    //         if (sessionData) {
-    //             this.session = sessionData;
-    //         }
-    //     } catch (error) {
-    //     }
-    // }
+    private session: SRPSessionData | null = null; // { port: 0, host: "127.0.0.1", secure: true, srpClient: null, };
 
     async getSessionStorageData(): Promise<SRPSessionData> {
         if (this.session) {
             return this.session;
         }
 
-        const storageStr = sessionStorage.getItem(SESSIONSTORAGE_CONNECTION_STR_KEY);
+        // const storageStr = sessionStorage.getItem(SESSIONSTORAGE_CONNECTION_STR_KEY);
+        const storageStr = await getSessionStorageItem(SESSIONSTORAGE_CONNECTION_STR_KEY);;
         const sessionData: SRPSessionData = storageStr && JSON.parse(storageStr);
         if (sessionData) {
             this.session = sessionData;
@@ -164,7 +149,8 @@ class Configurator {
         const sessionData = getSessionDataFromHostReply(connectionString);
         this.session = sessionData;
 
-        sessionStorage.setItem(SESSIONSTORAGE_CONNECTION_STR_KEY, JSON.stringify(sessionData));
+        // sessionStorage.setItem(SESSIONSTORAGE_CONNECTION_STR_KEY, JSON.stringify(sessionData));
+        await setSessionStorageItem(SESSIONSTORAGE_CONNECTION_STR_KEY, JSON.stringify(sessionData));
 
         function getSessionDataFromHostReply(connectionString: string): SRPSessionData {
             const co = parseDpHostReply(connectionString);
@@ -217,29 +203,35 @@ class Configurator {
         }
         const newUrl = `${secure ? 'https' : 'http'}://${host}:${port.toString()}`;
 
-        let sessionId = this.sessionId;
+        // let sessionId = this.sessionId;
+        // if (!sessionId) {
+        //     this.sessionId = sessionId = sjcl.codec.hex.fromBits(sjcl.random.randomWords(2, 0));
+        // }
+        let sessionId = await getSessionStorageItem(SESSIONSTORAGE_SESSION_ID_KEY);
         if (!sessionId) {
-            this.sessionId = sessionId = sjcl.codec.hex.fromBits(sjcl.random.randomWords(2, 0));
+            const newId = sjcl.codec.hex.fromBits(sjcl.random.randomWords(2, 0));
+            sessionId = newId;
+            await setSessionStorageItem(SESSIONSTORAGE_SESSION_ID_KEY, newId);
         }
 
         let connectionUrl = `${newUrl.replace('http', 'ws')}/${dpAgentChannelId}?username=${srpClient.p1}&M1=${M1}`;
-        connectionUrl += `&sessionId=${this.sessionId}`;
+        connectionUrl += `&sessionId=${sessionId}`;
         connectionUrl += `&version=${envSdk.version.toString()}`;
 
         return connectionUrl;
     }
 
-    private get sessionId(): string | null {
-        return sessionStorage.getItem(SESSIONSTORAGE_SESSION_ID_KEY);
-    }
+    // private get sessionId(): string | null {
+    //     return sessionStorage.getItem(SESSIONSTORAGE_SESSION_ID_KEY);
+    // }
 
-    private set sessionId(value: string | null) {
-        if (!value) {
-            sessionStorage.removeItem(SESSIONSTORAGE_SESSION_ID_KEY);
-        } else {
-            sessionStorage.setItem(SESSIONSTORAGE_SESSION_ID_KEY, value);
-        }
-    }
+    // private set sessionId(value: string | null) {
+    //     if (!value) {
+    //         sessionStorage.removeItem(SESSIONSTORAGE_SESSION_ID_KEY);
+    //     } else {
+    //         sessionStorage.setItem(SESSIONSTORAGE_SESSION_ID_KEY, value);
+    //     }
+    // }
 }
 
 export const configurator = new Configurator();

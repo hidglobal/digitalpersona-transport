@@ -1,6 +1,11 @@
 ﻿import { OptionsParams, WebChannelOptions, envSdk, traceSdk } from './channel-definitions';
 import { WebChannelClientImpl } from './channel-client-implementation';
 
+export type OnConnectionFailed = WebChannelClientImpl['onConnectionFailed'];
+export type OnConnectionSucceed = WebChannelClientImpl['onConnectionSucceed'];
+export type OnDataReceivedBin = WebChannelClientImpl['onDataReceivedBin'];
+export type OnDataReceivedTxt = WebChannelClientImpl['onDataReceivedTxt'];
+
 export class WebChannelClient {
     private impl: WebChannelClientImpl;
 
@@ -40,15 +45,15 @@ export class WebChannelClient {
         this.impl.stopReconnectTimer();
     };
 
-    get onConnectionFailed() { return this.impl.onConnectionFailed; }
-    set onConnectionFailed(v) { this.impl.onConnectionFailed = v; }
+    get onConnectionFailed(): OnConnectionFailed { return this.impl.onConnectionFailed; }
+    set onConnectionFailed(cb: OnConnectionFailed) { this.impl.onConnectionFailed = cb; }
 
-    get onConnectionSucceed() { return this.impl.onConnectionSucceed; }
-    set onConnectionSucceed(v) { this.impl.onConnectionSucceed = v; }
+    get onConnectionSucceed(): OnConnectionSucceed { return this.impl.onConnectionSucceed; }
+    set onConnectionSucceed(cb: OnConnectionSucceed) { this.impl.onConnectionSucceed = cb; }
 
-    get onDataReceivedBin() { return this.impl.onDataReceivedBin; }
-    set onDataReceivedBin(v) { this.impl.onDataReceivedBin = v; }
+    get onDataReceivedBin(): OnDataReceivedBin { return this.impl.onDataReceivedBin; }
+    set onDataReceivedBin(cb: OnDataReceivedBin) { this.impl.onDataReceivedBin = cb; }
 
-    get onDataReceivedTxt() { return this.impl.onDataReceivedTxt; }
-    set onDataReceivedTxt(v) { this.impl.onDataReceivedTxt = v; }
+    get onDataReceivedTxt(): OnDataReceivedTxt { return this.impl.onDataReceivedTxt; }
+    set onDataReceivedTxt(cb: OnDataReceivedTxt) { this.impl.onDataReceivedTxt = cb; }
 }
