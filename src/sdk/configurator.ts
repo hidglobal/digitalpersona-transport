@@ -8,6 +8,53 @@ import { ajax } from './utils';
 const SESSIONSTORAGE_CONNECTION_STR_KEY: string = "websdk"; // sessionStorage connection string
 const SESSIONSTORAGE_SESSION_ID_KEY: string = "websdk.sessionId"; // sessionStorage session ID
 
+// chrome.storage.session.get(["key"]).then((result) => {
+//     console.log("Value currently is " + result.key);
+// });
+
+async function getSessionStorageItem<TResult = string>(key: string): Promise<TResult | null> {
+    const isWorkerStorage = typeof chrome !== 'undefined' && chrome.storage;
+    if (isWorkerStorage) {
+        return new Promise((resolve, reject) => {
+            chrome.storage.session.get([key], (result) => {
+                if (chrome.runtime.lastError) {
+                    reject(chrome.runtime.lastError);
+                } else {
+                    resolve(result[key]);
+                }
+            });
+        });
+    } else {
+        return sessionStorage.getItem(key) as TResult;
+    }
+}
+
+// chrome.storage.session.set({ key: value }).then(() => {
+//     console.log("Value was set");
+// });
+
+async function setSessionStorageItem(key: string, value: string | null): Promise<void> {
+    const isWorkerStorage = typeof chrome !== 'undefined' && chrome.storage;
+
+    if (isWorkerStorage) {
+        return new Promise<void>((resolve, reject) => {
+            chrome.storage.session.set({ [key]: value }, () => {
+                if (chrome.runtime.lastError) {
+                    reject(chrome.runtime.lastError);
+                } else {
+                    resolve();
+                }
+            });
+        });
+    } else {
+        if (!value) {
+            sessionStorage.removeItem(key);
+        } else {
+            sessionStorage.setItem(key, value);
+        }
+    }
+}
+
 /*
 // Response from 'https://127.0.0.1:52181/get_connection':
 // {"endpoint": "https://127.0.0.1:9001/?web_sdk_id=88436d25-94e4-4dff-9495-d1eacc1bf363&web_sdk_minport=9001&web_sdk_port=9001&web_sdk_secure=true&web_sdk_username=x6Lsn3u8Z14&web_sdk_password=270AD8A85B4EC070&web_sdk_salt=E3DC74D8FB769D7D9C052D80342E158361BF91CB7144DBE5AB15B8A550823898"}
@@ -114,14 +161,12 @@ class Configurator {
             throw new Error('No connection endpoint.');
         }
 
-        //await this.parseHostReply(connectionString);
-
-        const sessionData = getSRPSessionData(connectionString);
+        const sessionData = getSessionDataFromHostReply(connectionString);
         this.session = sessionData;
 
         sessionStorage.setItem(SESSIONSTORAGE_CONNECTION_STR_KEY, JSON.stringify(sessionData));
 
-        function getSRPSessionData(connectionString: string): SRPSessionData {
+        function getSessionDataFromHostReply(connectionString: string): SRPSessionData {
             const co = parseDpHostReply(connectionString);
 
             const sd: SRPSessionData = {
