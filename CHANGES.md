@@ -69,6 +69,10 @@ smartcard readers etc. These devices are not directly accessible from Javascript
 * Remove property 'path' from WebChannelClient. It's comming from user already and is duplicate of user information
 * WebSdk.IWebChannelClient.sendDataBin type is (data: number[]) => void; not (data: ArrayBuffer) => void (see AESEncryption())
 
+* Configurator session is now a private member and can be accessed with public async function configurator.getSessionStorageData().
+* configurator.ensureLoaded() will throw an error instead of returning object with error member.
+* Add callback types
+ 
 # Original API file
 
 ```ts
