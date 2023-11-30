@@ -1,6 +1,6 @@
 ﻿import { envSdk, traceSdk } from './channel-definitions';
 import { ErrorOrDataResult, configurator } from './configurator';
-import { FixedQueue, createDeferredPromise } from './utils';
+import { FixedQueue } from './utils';
 import { generateSessionKey } from './session-key';
 import * as cipher from './cipher';
 
@@ -32,7 +32,7 @@ export class WebChannelClientImpl {
     public onDataReceivedTxt: null | ((data: any) => void) = null;
 
     constructor(dpAgentChannelId: string) {
-        traceSdk(`wccImpl.constructor({version: ${envSdk.version}, dpAgentClientId: "${dpAgentChannelId}"})`);
+        traceSdk(`wci.constructor({version: ${envSdk.version}, dpAgentClientId: "${dpAgentChannelId}"})`); // wci - wc implementation
         if (!dpAgentChannelId) {
             throw new Error("clientPath cannot be empty");
         }
@@ -43,7 +43,7 @@ export class WebChannelClientImpl {
     * Connects to web socket server and setups all event listeners
     */
     private async wsconnect(url: string): Promise<void> {
-        traceSdk(`wccImpl.wsconnect(${url})`);
+        traceSdk(`wci.wsconnect(${url})`);
 
         if (this.webSocket) {
             if (this.webSocket.readyState !== WebSocket.CLOSED) {
@@ -57,18 +57,18 @@ export class WebChannelClientImpl {
             this.webSocket.binaryType = 'arraybuffer'; // We need binary type 'arraybuffer' because default type 'blob' is not working
 
             this.webSocket.onclose = () => {
-                traceSdk("wccImpl.wsonclose()");
+                traceSdk("wci.wsonclose()");
                 this.removeEventHandlers(true);
             };
 
             this.webSocket.onopen = () => {
-                traceSdk("wccImpl.wsonopen()");
+                traceSdk("wci.wsonopen()");
                 this.webSocket && (this.webSocket.onerror = this.onRuntimeError);
                 resolve();
             };
 
             this.webSocket.onerror = (...args) => {
-                traceSdk(`wccImpl.wsonerror(${args})`);
+                traceSdk('wci.wsonerror()', args);
                 reject(new Error("WebSocket connection failed."));
             };
 
@@ -80,6 +80,8 @@ export class WebChannelClientImpl {
     * Closes web socket connection and cleans up all event listeners
     */
     private async wsdisconnect(): Promise<void> {
+        traceSdk(`wci.wsdisconnect()`);
+
         return new Promise<void>((resolve, reject) => {
             if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
                 resolve();
@@ -91,29 +93,10 @@ export class WebChannelClientImpl {
                 this.webSocket.close();
             }
         });
-
-        // const self = this;
-        // const deferredPromise = createDeferredPromise();
-
-        // if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
-        //     deferredPromise.resolve();
-        // } else {
-        //     this.webSocket.onclose = function (event) {
-        //         self.wsonclose(false);
-        //         deferredPromise.resolve();
-        //     };
-        //     this.webSocket.close();
-        // }
-
-        //TODO: this.webSocket = null; - done
-        //TODO: replace deferredPromise with the real Promise - done
-        //TODO: move generateSessionKey() out of this file - done
-
-        // return deferredPromise.promise;
     }
 
     private removeEventHandlers(isFailed: boolean): void {
-        traceSdk("wccImpl.wsonclose()");
+        traceSdk("wci.wsonclose()");
 
         if (this.webSocket) {
             this.webSocket.onclose = null;
@@ -149,7 +132,7 @@ export class WebChannelClientImpl {
         }
     }
 
-    public wssend(data: any): boolean { // Sends data over web socket
+    private wssend(data: any): boolean { // Sends data over web socket
         if (!this.isConnected() || !this.webSocket) {
             return false;
         }
@@ -167,11 +150,14 @@ export class WebChannelClientImpl {
     * True if web socket is ready for transferring data
     */
     public isConnected(): boolean {
-        return !!this.webSocket && this.webSocket.readyState === WebSocket.OPEN;
+        return this.webSocket?.readyState === WebSocket.OPEN;
     }
 
     private stopMessageQueueInterval(): void {
-        this.queueInterval && (clearInterval(this.queueInterval), this.queueInterval = null);
+        if (this.queueInterval) {
+            clearInterval(this.queueInterval);
+            this.queueInterval = null;
+        }
     }
 
     private startMessageQueueInterval(): void {
@@ -187,14 +173,22 @@ export class WebChannelClientImpl {
         if (!this.queue.length) {
             return;
         }
-        traceSdk(`wccImpl.processMessageQueue(${this.queue.length})`);
+        traceSdk(`wci.processMessageQueue(${this.queue.length})`);
 
-        for (var i = 0; i < this.queue.length;) {
-            if (!this.wssend(this.queue.items[i])) {
+        while (this.queue.length > 0) {
+            if (!this.wssend(this.queue.items[0])) {
                 break;
             }
-            this.queue.splice(i, 1);
+            this.queue.splice(0, 1);
         }
+
+        // for (var i = 0; i < this.queue.length;) {
+        //     if (!this.wssend(this.queue.items[i])) {
+        //         break;
+        //     }
+        //     this.queue.splice(i, 1);
+        // }
+
         if (this.queue.length === 0) {
             this.stopMessageQueueInterval();
         }
@@ -230,7 +224,7 @@ export class WebChannelClientImpl {
     * Sets up connection with parameters from configurator (generates session key and connects to websocket server).
     */
     private async setupSecureChannel(): Promise<ErrorOrDataResult> {
-        traceSdk('wccImpl.setupSecureChannel()');
+        traceSdk('wci.setupSecureChannel()');
 
         const { sessionKey, M1, error } = await generateSessionKey();
         if (error) {
@@ -253,7 +247,7 @@ export class WebChannelClientImpl {
     }
 
     private async tryConnectNTimes(nAttempts: number): Promise<void> {
-        traceSdk('wccImpl.connectInternal()');
+        traceSdk('wci.connectInternal()');
 
         this.stopReconnectTimer();
         if (this.isConnected()) {
