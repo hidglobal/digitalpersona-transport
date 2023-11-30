@@ -72,7 +72,7 @@ export class WebChannelClientImpl {
                 reject(new Error("WebSocket connection failed."));
             };
 
-            this.webSocket.onmessage = (event: MessageEvent<any>) => this.wsonmessage(event);
+            this.webSocket.onmessage = (event: MessageEvent<any>) => this._onMessage(event);
         });
     }
 
@@ -111,7 +111,7 @@ export class WebChannelClientImpl {
         isFailed && this.onConnectionFailed?.();
     }
 
-    private wsonmessage(event: MessageEvent<any>): void {
+    private _onMessage(event: MessageEvent<any>): void {
         cipher.decode(this.sessionKey, this.M1, event.data)
             .then((data) => typeof data === 'string' ? this.onDataReceivedTxt?.(data) : this.onDataReceivedBin?.(data));
     }
@@ -146,13 +146,6 @@ export class WebChannelClientImpl {
         return true;
     }
 
-    /**
-    * True if web socket is ready for transferring data
-    */
-    public isConnected(): boolean {
-        return this.webSocket?.readyState === WebSocket.OPEN;
-    }
-
     private stopMessageQueueInterval(): void {
         if (this.queueInterval) {
             clearInterval(this.queueInterval);
@@ -182,33 +175,9 @@ export class WebChannelClientImpl {
             this.queue.splice(0, 1);
         }
 
-        // for (var i = 0; i < this.queue.length;) {
-        //     if (!this.wssend(this.queue.items[i])) {
-        //         break;
-        //     }
-        //     this.queue.splice(i, 1);
-        // }
-
         if (this.queue.length === 0) {
             this.stopMessageQueueInterval();
         }
-    }
-
-    public stopReconnectTimer(): void {
-        this.reconnectTimer && (clearInterval(this.reconnectTimer), this.reconnectTimer = null);
-    }
-
-    public startReconnectTimer(): void {
-        this.stopReconnectTimer();
-        this.reconnectTimer = setInterval(() => this.tryConnectNTimes(1), this.wsReconnectInterval);
-    }
-
-    public async connect(): Promise<void> {
-        await this.tryConnectNTimes(3);
-    }
-
-    public async disconnect(): Promise<void> {
-        await this.wsdisconnect();
     }
 
     private reportError = (error: unknown) => {
@@ -272,6 +241,30 @@ export class WebChannelClientImpl {
         } catch (error) {
             this.onConnectionFailed?.((error instanceof Error ? error.message : (error as any).toString()) || 'tm.error.connect');
         }
+    }
+
+    /**
+    * True if web socket is ready for transferring data
+    */
+    public isConnected(): boolean {
+        return this.webSocket?.readyState === WebSocket.OPEN;
+    }
+
+    public stopReconnectTimer(): void {
+        this.reconnectTimer && (clearInterval(this.reconnectTimer), this.reconnectTimer = null);
+    }
+
+    public startReconnectTimer(nTimes: number = 1): void {
+        this.stopReconnectTimer();
+        this.reconnectTimer = setInterval(() => this.tryConnectNTimes(nTimes), this.wsReconnectInterval);
+    }
+
+    public async connect(nTimes: number = 3): Promise<void> {
+        await this.tryConnectNTimes(nTimes);
+    }
+
+    public async disconnect(): Promise<void> {
+        await this.wsdisconnect();
     }
 
 } //class WebChannelClientImpl

@@ -4,6 +4,25 @@
     reject: Function;
 };
 
+/**
+ * Example:
+ * ```
+ * async function foo(): Promise<void> {
+ *      const self = this;
+ *      const deferredPromise = createDeferredPromise();
+ *      if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
+ *          deferredPromise.resolve();
+ *      } else {
+ *          this.webSocket.onclose = function (event) {
+ *              self.wsonclose(false);
+ *              deferredPromise.resolve();
+ *          };
+ *          this.webSocket.close();
+ *      }
+ *      return deferredPromise.promise;
+ *  }
+ * ```
+ */
 export function createDeferredPromise<T = void>(): DeferredPromise<T> {
     const rv = {} as DeferredPromise<T>;
     rv.promise = new Promise((_resolve, _reject) => {
