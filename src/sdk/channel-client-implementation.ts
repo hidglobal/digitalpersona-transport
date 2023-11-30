@@ -61,6 +61,7 @@ export class WebChannelClientImpl {
 
         this.webSocket.onopen = () => {
             traceSdk("wccImpl.wsonopen()");
+            this.webSocket && (this.webSocket.onerror = this.onRuntimeError);
             deferredPromise.resolve();
         };
 
@@ -228,7 +229,6 @@ export class WebChannelClientImpl {
             const connectionUrl = await configurator.getDpAgentConnectionUrl({ dpAgentChannelId: this.dpAgentChannelId, M1: this.M1 });
 
             await this.wsconnect(connectionUrl);
-            this.webSocket && (this.webSocket.onerror = this.onRuntimeError);
 
             return {};
         } catch (error) {
