@@ -25,6 +25,7 @@ export class WebChannelClientImpl {
     private sessionKey: Uint8Array | null = null;
     private M1: string | undefined;
 
+    public onError: null | ((reason?: string) => void) = null;
     public onConnectionFailed: null | ((reason?: string) => void) = null;
     public onConnectionSucceed: null | (() => void) = null;
     public onDataReceivedBin: null | ((data: any) => void) = null;
@@ -44,7 +45,7 @@ export class WebChannelClientImpl {
     private wsconnect(url: string): Promise<void> {
         traceSdk(`wccImpl.wsconnect(${url})`);
 
-        let deferredPromise: DeferredPromise<void> | null = createDeferredPromise();
+        const deferredPromise = createDeferredPromise();
 
         if (this.webSocket && this.webSocket.readyState !== WebSocket.CLOSED) {
             throw new Error("disconnect has not been called");
@@ -53,27 +54,20 @@ export class WebChannelClientImpl {
         this.webSocket = new WebSocket(url);
         this.webSocket.binaryType = 'arraybuffer'; // we need binary type 'arraybuffer' because default type 'blob' is not working
 
-        this.webSocket.addEventListener("close",
-            () => {
-                traceSdk("wccImpl.wsonclose()");
-                this.wsonclose(true);
-            },
-            { once: true }
-        );
+        this.webSocket.onclose = () => {
+            traceSdk("wccImpl.wsonclose()");
+            this.wsonclose(true);
+        };
 
-        this.webSocket.addEventListener("open",
-            () => {
-                traceSdk("wccImpl.wsonopen()");
-                deferredPromise?.resolve();
-                deferredPromise = null;
-            },
-            { once: true }
-        );
+        this.webSocket.onopen = () => {
+            traceSdk("wccImpl.wsonopen()");
+            deferredPromise.resolve();
+        };
 
         this.webSocket.addEventListener("error",
             (...args) => {
                 traceSdk(`wccImpl.wsonerror(${args})`);
-                deferredPromise?.reject(new Error("WebSocket connection failed."));
+                deferredPromise.reject(new Error("WebSocket connection failed."));
             },
             { once: true }
         );
@@ -110,7 +104,7 @@ export class WebChannelClientImpl {
             this.webSocket.onclose = null;
             this.webSocket.onopen = null;
             this.webSocket.onmessage = null;
-            this.webSocket.onerror = null;
+            //this.webSocket.onerror = null;
         }
 
         this.stopMessageQueueInterval();
