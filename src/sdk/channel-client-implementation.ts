@@ -42,37 +42,67 @@ export class WebChannelClientImpl {
     /**
     * Connects to web socket server and setups all event listeners
     */
-    private wsconnect(url: string): Promise<void> {
+    private async wsconnect(url: string): Promise<void> {
         traceSdk(`wccImpl.wsconnect(${url})`);
 
-        const deferredPromise = createDeferredPromise();
-
-        if (this.webSocket && this.webSocket.readyState !== WebSocket.CLOSED) {
-            throw new Error("disconnect has not been called");
+        if (this.webSocket) {
+            if (this.webSocket.readyState !== WebSocket.CLOSED) {
+                throw new Error("disconnect has not been called");
+            }
+            //TODO: null it and events
         }
 
-        this.webSocket = new WebSocket(url);
-        this.webSocket.binaryType = 'arraybuffer'; // we need binary type 'arraybuffer' because default type 'blob' is not working
+        return new Promise<void>((resolve, reject) => {
+            this.webSocket = new WebSocket(url);
+            this.webSocket.binaryType = 'arraybuffer'; // We need binary type 'arraybuffer' because default type 'blob' is not working
 
-        this.webSocket.onclose = () => {
-            traceSdk("wccImpl.wsonclose()");
-            this.wsonclose(true);
-        };
+            this.webSocket.onclose = () => {
+                traceSdk("wccImpl.wsonclose()");
+                this.wsonclose(true);
+            };
 
-        this.webSocket.onopen = () => {
-            traceSdk("wccImpl.wsonopen()");
-            this.webSocket && (this.webSocket.onerror = this.onRuntimeError);
-            deferredPromise.resolve();
-        };
+            this.webSocket.onopen = () => {
+                traceSdk("wccImpl.wsonopen()");
+                this.webSocket && (this.webSocket.onerror = this.onRuntimeError);
+                resolve();
+            };
 
-        this.webSocket.onerror = (...args) => {
-            traceSdk(`wccImpl.wsonerror(${args})`);
-            deferredPromise.reject(new Error("WebSocket connection failed."));
-        };
+            this.webSocket.onerror = (...args) => {
+                traceSdk(`wccImpl.wsonerror(${args})`);
+                reject(new Error("WebSocket connection failed."));
+            };
 
-        this.webSocket.onmessage = (event: MessageEvent<any>) => this.wsonmessage(event);
+            this.webSocket.onmessage = (event: MessageEvent<any>) => this.wsonmessage(event);
+        });
 
-        return deferredPromise.promise;
+        // const deferredPromise = createDeferredPromise();
+
+        // if (this.webSocket && this.webSocket.readyState !== WebSocket.CLOSED) {
+        //     throw new Error("disconnect has not been called");
+        // }
+
+        // this.webSocket = new WebSocket(url);
+        // this.webSocket.binaryType = 'arraybuffer'; // we need binary type 'arraybuffer' because default type 'blob' is not working
+
+        // this.webSocket.onclose = () => {
+        //     traceSdk("wccImpl.wsonclose()");
+        //     this.wsonclose(true);
+        // };
+
+        // this.webSocket.onopen = () => {
+        //     traceSdk("wccImpl.wsonopen()");
+        //     this.webSocket && (this.webSocket.onerror = this.onRuntimeError);
+        //     deferredPromise.resolve();
+        // };
+
+        // this.webSocket.onerror = (...args) => {
+        //     traceSdk(`wccImpl.wsonerror(${args})`);
+        //     deferredPromise.reject(new Error("WebSocket connection failed."));
+        // };
+
+        // this.webSocket.onmessage = (event: MessageEvent<any>) => this.wsonmessage(event);
+
+        // return deferredPromise.promise;
     }
 
     /**
