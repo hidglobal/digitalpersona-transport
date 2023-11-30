@@ -1,7 +1,7 @@
 ﻿import { envSdk, WebSdkEncryptionSupport, traceSdk } from './channel-definitions';
 import { BigInteger, SRPClient, sjcl } from 'ts-srpclient';
 import { ErrorOrDataResult, configurator } from './configurator';
-import { DeferredPromise, FixedQueue, ajax, createDeferredPromise } from './utils';
+import { FixedQueue, ajax, createDeferredPromise } from './utils';
 import * as cipher from './cipher';
 
 export type OnConnectionFailed = WebChannelClientImpl['onConnectionFailed'];
@@ -25,7 +25,7 @@ export class WebChannelClientImpl {
     private sessionKey: Uint8Array | null = null;
     private M1: string | undefined;
 
-    public onError: null | ((reason?: string) => void) = null;
+    public onError: null | ((reason?: Event | string) => void) = null;
     public onConnectionFailed: null | ((reason?: string) => void) = null;
     public onConnectionSucceed: null | (() => void) = null;
     public onDataReceivedBin: null | ((data: any) => void) = null;
@@ -64,13 +64,10 @@ export class WebChannelClientImpl {
             deferredPromise.resolve();
         };
 
-        this.webSocket.addEventListener("error",
-            (...args) => {
-                traceSdk(`wccImpl.wsonerror(${args})`);
-                deferredPromise.reject(new Error("WebSocket connection failed."));
-            },
-            { once: true }
-        );
+        this.webSocket.onerror = (...args) => {
+            traceSdk(`wccImpl.wsonerror(${args})`);
+            deferredPromise.reject(new Error("WebSocket connection failed."));
+        };
 
         this.webSocket.onmessage = (event: MessageEvent<any>) => this.wsonmessage(event);
 
@@ -104,7 +101,7 @@ export class WebChannelClientImpl {
             this.webSocket.onclose = null;
             this.webSocket.onopen = null;
             this.webSocket.onmessage = null;
-            //this.webSocket.onerror = null;
+            this.webSocket.onerror = null;
         }
 
         this.stopMessageQueueInterval();
@@ -117,11 +114,13 @@ export class WebChannelClientImpl {
     }
 
     public sendDataBin(data: number[]): void {
-        cipher.encode(this.sessionKey, this.M1, data).then((data) => this.sendData(data)).catch(this.reportError);
+        cipher.encode(this.sessionKey, this.M1, data)
+            .then((data) => this.sendData(data)).catch(this.reportError);
     }
 
     public sendDataTxt(data: string): void {
-        cipher.encode(this.sessionKey, this.M1, data).then((data) => this.sendData(data)).catch(this.reportError);;
+        cipher.encode(this.sessionKey, this.M1, data)
+            .then((data) => this.sendData(data)).catch(this.reportError);;
     }
 
     public sendData(data: any): void { // Sends message if channel is ready otherwise, adds message to the queue.
@@ -203,15 +202,9 @@ export class WebChannelClientImpl {
         console.error(msg);
     };
 
-    private async generateSessionKey(): Promise<ErrorOrDataResult> {
-        const { sessionKey, M1, error } = await generateSessionKey();
-        if (error) {
-            return { error };
-        }
-        this.sessionKey = sessionKey || null;
-        this.M1 = M1;
-        return {data: M1};
-    }
+    private onRuntimeError = (event?: Event | string) => {
+        this.onError ? this.onError(event) : this.reportError(event);
+    };
 
     /**
     * Sets up connection with parameters from configurator (generates session key and connects to websocket server).
@@ -219,14 +212,20 @@ export class WebChannelClientImpl {
     private async setupSecureChannel(): Promise<ErrorOrDataResult> {
         traceSdk('wccImpl.setupSecureChannel()');
 
-        const res = await this.generateSessionKey();
-        if (res.error) {
-            return res;
+        const { sessionKey, M1, error } = await generateSessionKey();
+        if (error) {
+            return { error };
         }
+
+        this.sessionKey = sessionKey || null;
+        this.M1 = M1;
 
         try {
             const connectionUrl = await configurator.getDpAgentConnectionUrl({ dpAgentChannelId: this.dpAgentChannelId, M1: this.M1 });
+
             await this.wsconnect(connectionUrl);
+            this.webSocket && (this.webSocket.onerror = this.onRuntimeError);
+
             return {};
         } catch (error) {
             traceSdk(error);
@@ -246,13 +245,13 @@ export class WebChannelClientImpl {
             await configurator.ensureLoaded();
 
             let attemptsLeft = nAttempts;
-            let res2: ErrorOrDataResult;
+            let ok: ErrorOrDataResult;
             do {
-                res2 = await this.setupSecureChannel();
-            } while (!!res2.error && --attemptsLeft > 0);
+                ok = await this.setupSecureChannel();
+            } while (!!ok.error && --attemptsLeft > 0);
 
-            if (res2.error) {
-                throw new Error(res2.error);
+            if (ok.error) {
+                throw new Error(ok.error);
             }
 
             this.onConnectionSucceed?.();
@@ -264,7 +263,7 @@ export class WebChannelClientImpl {
 
 } //class WebChannelClientImpl
 
-async function generateSessionKey() {
+async function generateSessionKey(): Promise<{ sessionKey: Uint8Array; M1: string; error?: undefined; } | { error: string; sessionKey?: undefined; M1?: undefined; }> {
     try {
         const srpData = (await configurator.getSessionStorageData())?.srpClient;
         if (!srpData?.p1 || !srpData.p2 || !srpData.salt) {
