@@ -49,7 +49,7 @@ export class WebChannelClientImpl {
             if (this.webSocket.readyState !== WebSocket.CLOSED) {
                 throw new Error("disconnect has not been called");
             }
-            this.wsonclose(false);
+            this.removeEventHandlers(false);
         }
 
         return new Promise<void>((resolve, reject) => {
@@ -58,7 +58,7 @@ export class WebChannelClientImpl {
 
             this.webSocket.onclose = () => {
                 traceSdk("wccImpl.wsonclose()");
-                this.wsonclose(true);
+                this.removeEventHandlers(true);
             };
 
             this.webSocket.onopen = () => {
@@ -79,28 +79,40 @@ export class WebChannelClientImpl {
     /**
     * Closes web socket connection and cleans up all event listeners
     */
-    private wsdisconnect(): Promise<void> {
-        const self = this;
-        const deferredPromise = createDeferredPromise();
+    private async wsdisconnect(): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
+                resolve();
+            } else {
+                this.webSocket.onclose = () => {
+                    this.removeEventHandlers(false);
+                    resolve();
+                };
+                this.webSocket.close();
+            }
+        });
 
-        if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
-            deferredPromise.resolve();
-        } else {
-            this.webSocket.onclose = function (event) {
-                self.wsonclose(false);
-                deferredPromise.resolve();
-            };
-            this.webSocket.close();
-        }
+        // const self = this;
+        // const deferredPromise = createDeferredPromise();
 
-        //TODO: this.webSocket = null;
-        //TODO: replace deferredPromise with the real Promise
+        // if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
+        //     deferredPromise.resolve();
+        // } else {
+        //     this.webSocket.onclose = function (event) {
+        //         self.wsonclose(false);
+        //         deferredPromise.resolve();
+        //     };
+        //     this.webSocket.close();
+        // }
+
+        //TODO: this.webSocket = null; - done
+        //TODO: replace deferredPromise with the real Promise - done
         //TODO: move generateSessionKey() out of this file - done
 
-        return deferredPromise.promise;
+        // return deferredPromise.promise;
     }
 
-    wsonclose(isFailed: boolean): void {
+    private removeEventHandlers(isFailed: boolean): void {
         traceSdk("wccImpl.wsonclose()");
 
         if (this.webSocket) {
