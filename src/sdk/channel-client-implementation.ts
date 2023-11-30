@@ -1,7 +1,7 @@
 ﻿import { envSdk, WebSdkEncryptionSupport, traceSdk } from './channel-definitions';
 import { BigInteger, SRPClient, sjcl } from 'ts-srpclient';
 import { ErrorOrDataResult, configurator } from './configurator';
-import { FixedQueue, ajax, createDeferredPromise } from './utils';
+import { DeferredPromise, FixedQueue, ajax, createDeferredPromise } from './utils';
 import * as cipher from './cipher';
 
 export type OnConnectionFailed = WebChannelClientImpl['onConnectionFailed'];
@@ -44,7 +44,7 @@ export class WebChannelClientImpl {
     private wsconnect(url: string): Promise<void> {
         traceSdk(`wccImpl.wsconnect(${url})`);
 
-        const deferredPromise = createDeferredPromise();
+        let deferredPromise: DeferredPromise<void> | null = createDeferredPromise();
 
         if (this.webSocket && this.webSocket.readyState !== WebSocket.CLOSED) {
             throw new Error("disconnect has not been called");
@@ -53,20 +53,30 @@ export class WebChannelClientImpl {
         this.webSocket = new WebSocket(url);
         this.webSocket.binaryType = 'arraybuffer'; // we need binary type 'arraybuffer' because default type 'blob' is not working
 
-        this.webSocket.onclose = (event) => {
-            traceSdk("wccImpl.wsonclose()");
-            return this.wsonclose(true);
-        };
+        this.webSocket.addEventListener("close",
+            () => {
+                traceSdk("wccImpl.wsonclose()");
+                this.wsonclose(true);
+            },
+            { once: true }
+        );
 
-        this.webSocket.onopen = function (event) {
-            traceSdk("wccImpl.wsonopen()");
-            deferredPromise.resolve();
-        };
+        this.webSocket.addEventListener("open",
+            () => {
+                traceSdk("wccImpl.wsonopen()");
+                deferredPromise?.resolve();
+                deferredPromise = null;
+            },
+            { once: true }
+        );
 
-        this.webSocket.onerror = function (event) {
-            traceSdk(`wccImpl.wsonerror(${arguments})`);
-            return deferredPromise.reject(new Error("WebSocket connection failed."));
-        };
+        this.webSocket.addEventListener("error",
+            (...args) => {
+                traceSdk(`wccImpl.wsonerror(${args})`);
+                deferredPromise?.reject(new Error("WebSocket connection failed."));
+            },
+            { once: true }
+        );
 
         this.webSocket.onmessage = (event: MessageEvent<any>) => this.wsonmessage(event);
 
