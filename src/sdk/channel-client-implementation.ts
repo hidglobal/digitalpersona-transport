@@ -4,39 +4,41 @@ import { FixedQueue } from './utils';
 import { generateSessionKey } from './session-key';
 import * as cipher from './cipher';
 
-export type OnConnectionFailed = WebChannelClientImpl['onConnectionFailed'];
-export type OnConnectionSucceed = WebChannelClientImpl['onConnectionSucceed'];
-export type OnDataReceivedBin = WebChannelClientImpl['onDataReceivedBin'];
-export type OnDataReceivedTxt = WebChannelClientImpl['onDataReceivedTxt'];
+export type OnError = null | ((reason?: Event | string) => void);
+export type OnConnectionFailed = null | ((reason?: string) => void);
+export type OnConnectionSucceed = null | (() => void);
+export type OnDataReceivedBin = null | ((data: any) => void);
+export type OnDataReceivedTxt = null | ((data: any) => void);
+
+const consts = {
+    wsReconnectInterval: 5000,
+    wsThreshold: 10240,     // max number of buffered bytes (10k)
+    mqInterval: 1000,       // interval to process message queue and send data over web-socket if buffer size is less then the threshold
+    mqLimit: 100,           // maximum queue size, when reaching this limit the oldest messages will be removed from the queue.
+}
 
 export class WebChannelClientImpl {
-    private dpAgentChannelId: string;
-
-    private wsThreshold: number = 10240;        // max number of buffered bytes (10k)
-    private wsQueueInterval: number = 1000;     // interval to process message queue and send data over web-socket if buffer size is less then the threshold
-    private wsQueueLimit: number = 100;         // maximum queue size, when reaching this limit the oldest messages will be removed from the queue.
-    private wsReconnectInterval: number = 5000;
-
-    private queue: FixedQueue = new FixedQueue(this.wsQueueLimit);
-    private queueInterval: ReturnType<typeof setInterval> | null = null;
-    private reconnectTimer: ReturnType<typeof setInterval> | null = null;
-
     private webSocket: null | WebSocket = null;
     private sessionKey: Uint8Array | null = null;
     private M1: string | undefined;
+    private channelId: string; // DpAgent channel Id
 
-    public onError: null | ((reason?: Event | string) => void) = null;
-    public onConnectionFailed: null | ((reason?: string) => void) = null;
-    public onConnectionSucceed: null | (() => void) = null;
-    public onDataReceivedBin: null | ((data: any) => void) = null;
-    public onDataReceivedTxt: null | ((data: any) => void) = null;
+    private mq: FixedQueue = new FixedQueue(consts.mqLimit); // message queue
+    private mqIntervalId: ReturnType<typeof setInterval> | null = null;
+    private reconnectTimer: ReturnType<typeof setInterval> | null = null;
+
+    public onError: OnError = null;
+    public onConnectionFailed: OnConnectionFailed = null;
+    public onConnectionSucceed: OnConnectionSucceed = null;
+    public onDataReceivedBin: OnDataReceivedBin = null;
+    public onDataReceivedTxt: OnDataReceivedTxt = null;
 
     constructor(dpAgentChannelId: string) {
         traceSdk(`wci.constructor({version: ${envSdk.version}, dpAgentClientId: "${dpAgentChannelId}"})`); // wci - wc implementation
         if (!dpAgentChannelId) {
             throw new Error("clientPath cannot be empty");
         }
-        this.dpAgentChannelId = dpAgentChannelId;
+        this.channelId = dpAgentChannelId;
     }
 
     /**
@@ -56,10 +58,7 @@ export class WebChannelClientImpl {
             this.webSocket = new WebSocket(url);
             this.webSocket.binaryType = 'arraybuffer'; // We need binary type 'arraybuffer' because default type 'blob' is not working
 
-            this.webSocket.onclose = () => {
-                traceSdk("wci.wsonclose()");
-                this.removeEventHandlers(true);
-            };
+            this.webSocket.onmessage = (event: MessageEvent<any>) => this._onMessage(event);
 
             this.webSocket.onopen = () => {
                 traceSdk("wci.wsonopen()");
@@ -67,12 +66,15 @@ export class WebChannelClientImpl {
                 resolve();
             };
 
-            this.webSocket.onerror = (...args) => {
-                traceSdk('wci.wsonerror()', args);
-                reject(new Error("WebSocket connection failed."));
+            this.webSocket.onclose = () => {
+                traceSdk("wci.wsonclose()");
+                this.removeEventHandlers(true);
             };
 
-            this.webSocket.onmessage = (event: MessageEvent<any>) => this._onMessage(event);
+            this.webSocket.onerror = (...args) => {
+                traceSdk('wci.wsonerror()', args);
+                reject(new Error("WebSocket connection failed"));
+            };
         });
     }
 
@@ -107,38 +109,43 @@ export class WebChannelClientImpl {
             this.webSocket = null;
         }
 
-        this.stopMessageQueueInterval();
+        this.stopMqInterval();
         isFailed && this.onConnectionFailed?.();
     }
 
     private _onMessage(event: MessageEvent<any>): void {
         cipher.decode(this.sessionKey, this.M1, event.data)
-            .then((data) => typeof data === 'string' ? this.onDataReceivedTxt?.(data) : this.onDataReceivedBin?.(data));
+            .then((data) => (
+                typeof data === 'string'
+                    ? this.onDataReceivedTxt?.(data)
+                    : this.onDataReceivedBin?.(data)
+            ));
     }
 
     public sendDataBin(data: number[]): void {
         cipher.encode(this.sessionKey, this.M1, data)
-            .then((data) => this.sendData(data)).catch(this.reportError);
+            .then((data) => this.sendData(data)).catch((error) => this.reportError(error));
     }
 
     public sendDataTxt(data: string): void {
         cipher.encode(this.sessionKey, this.M1, data)
-            .then((data) => this.sendData(data)).catch(this.reportError);;
+            .then((data) => this.sendData(data)).catch((error) => this.reportError(error));;
     }
 
     public sendData(data: any): void { // Sends message if channel is ready otherwise, adds message to the queue.
         if (!this.wssend(data)) {
-            this.queue.push(data);
+            this.mq.push(data);
         }
     }
 
     private wssend(data: any): boolean { // Sends data over web socket
         if (!this.isConnected() || !this.webSocket) {
+            this.reportError("WebSocket is not connected");
             return false;
         }
 
-        if (this.webSocket.bufferedAmount >= this.wsThreshold) {
-            this.startMessageQueueInterval();
+        if (this.webSocket.bufferedAmount >= consts.wsThreshold) {
+            this.startMqInterval();
             return false;
         }
 
@@ -146,42 +153,41 @@ export class WebChannelClientImpl {
         return true;
     }
 
-    private stopMessageQueueInterval(): void {
-        if (this.queueInterval) {
-            clearInterval(this.queueInterval);
-            this.queueInterval = null;
-        }
-    }
-
-    private startMessageQueueInterval(): void {
-        if (!this.queueInterval) {
-            this.queueInterval = setInterval(() => this.processMessageQueue(), this.wsQueueInterval);
-        }
-    }
-
     /**
-    * Sends messages from a queue if any. Initiates secure connection if needed and has not been yet initiated.
-    */
-    private processMessageQueue(): void {
-        if (!this.queue.length) {
-            return;
-        }
-        traceSdk(`wci.processMessageQueue(${this.queue.length})`);
+     * Process message queue (Mq) will send messages from queue.
+     */
+    private processMq(): void {
+        if (this.mq.length) {
+            traceSdk(`wci.processMessageQueue(${this.mq.length})`);
 
-        while (this.queue.length > 0) {
-            if (!this.wssend(this.queue.items[0])) {
-                break;
+            while (this.mq.length > 0) {
+                if (!this.wssend(this.mq.items[0])) {
+                    break;
+                }
+                this.mq.splice(0, 1);
             }
-            this.queue.splice(0, 1);
-        }
 
-        if (this.queue.length === 0) {
-            this.stopMessageQueueInterval();
+            if (!this.mq.length) {
+                this.stopMqInterval();
+            }
+        }
+    }
+
+    private stopMqInterval(): void {
+        if (this.mqIntervalId) {
+            clearInterval(this.mqIntervalId);
+            this.mqIntervalId = null;
+        }
+    }
+
+    private startMqInterval(): void {
+        if (!this.mqIntervalId) {
+            this.mqIntervalId = setInterval(() => this.processMq(), consts.mqInterval);
         }
     }
 
     private reportError = (error: unknown) => {
-        const msg = (error instanceof Error ? error.message : (error as any).toString()) || 'tm.error.connect';
+        const msg = (error instanceof Error ? error.message : (error as any).toString()) || 'tm.error';
         console.error(msg);
     };
 
@@ -204,7 +210,7 @@ export class WebChannelClientImpl {
         this.M1 = M1;
 
         try {
-            const connectionUrl = await configurator.getDpAgentConnectionUrl({ dpAgentChannelId: this.dpAgentChannelId, M1: this.M1 });
+            const connectionUrl = await configurator.getDpAgentConnectionUrl({ dpAgentChannelId: this.channelId, M1: this.M1 });
 
             await this.wsconnect(connectionUrl);
 
@@ -237,14 +243,14 @@ export class WebChannelClientImpl {
             }
 
             this.onConnectionSucceed?.();
-            this.processMessageQueue();
+            this.processMq();
         } catch (error) {
             this.onConnectionFailed?.((error instanceof Error ? error.message : (error as any).toString()) || 'tm.error.connect');
         }
     }
 
     /**
-    * True if web socket is ready for transferring data
+    * Returns true if web socket is ready to transfer data.
     */
     public isConnected(): boolean {
         return this.webSocket?.readyState === WebSocket.OPEN;
@@ -256,7 +262,7 @@ export class WebChannelClientImpl {
 
     public startReconnectTimer(nTimes: number = 1): void {
         this.stopReconnectTimer();
-        this.reconnectTimer = setInterval(() => this.tryConnectNTimes(nTimes), this.wsReconnectInterval);
+        this.reconnectTimer = setInterval(() => this.tryConnectNTimes(nTimes), consts.wsReconnectInterval);
     }
 
     public async connect(nTimes: number = 3): Promise<void> {
